@@ -1,1 +1,485 @@
+import React, { useState, useEffect, useContext, createContext, useRef } from 'react';
+import { Brain, Users, ChevronRight, GraduationCap, Lock, ArrowUpCircle, Award, CheckCircle2, XCircle, RefreshCw, Calculator, FileSpreadsheet, Languages, Minus, Plus, Trophy, LayoutGrid, Image as ImageIcon, Timer, Eye, KeyRound, Clock, History, AlertTriangle, RotateCcw, Save, Download, Upload, Trash2, Cloud, CloudOff, MessageSquare, Send, Bot, Medal } from 'lucide-react';
+import { initializeApp } from "firebase/app";
+import { getFirestore, collection, doc, setDoc, onSnapshot, getDoc } from "firebase/firestore";
 
+// --- CONFIGURATION FIREBASE (À REMPLIR) ---
+// Collez les clés obtenues à l'Étape 1 ici :
+const firebaseConfig = {
+  apiKey: "", 
+  authDomain: "",
+  projectId: "",
+  storageBucket: "",
+  messagingSenderId: "",
+  appId: ""
+};
+
+// --- INITIALISATION FIREBASE ---
+let db;
+const isFirebaseConfigured = firebaseConfig.apiKey && firebaseConfig.apiKey.length > 5;
+
+if (isFirebaseConfigured) {
+    try {
+        const app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
+        console.log("Firebase connecté avec succès");
+    } catch (e) {
+        console.error("Erreur connexion Firebase:", e);
+    }
+} else {
+    console.warn("Firebase non configuré. Mode LocalStorage actif.");
+}
+
+// --- CONTEXTE ---
+const AppContext = createContext(null);
+
+// --- NIVEAUX ---
+const levelsMath = [
+  { id: 0, title: "الجمع (L'Addition)", keywords: ["جمع", "رقمان"], color: "bg-blue-100 text-blue-800", icon: "➕" },
+  { id: 1, title: "الطرح (La Soustraction)", keywords: ["طرح"], color: "bg-green-100 text-green-800", icon: "➖" },
+  { id: 2, title: "الضرب (La Multiplication)", keywords: ["ضرب"], color: "bg-yellow-100 text-yellow-800", icon: "✖️" },
+  { id: 3, title: "القسمة (La Division)", keywords: ["قسمة"], color: "bg-orange-100 text-orange-800", icon: "➗" },
+  { id: 4, title: "المسألة (Problèmes)", keywords: ["مسألة"], color: "bg-purple-100 text-purple-800", icon: "🧩" },
+];
+
+const levelsFr = [
+  { id: 0, title: "Débutant (Lettres)", keywords: ["debutant", "lettre", "alphabet"], color: "bg-slate-100 text-slate-800", icon: "🌱" },
+  { id: 1, title: "Sons & Syllabes", keywords: ["son", "syllabe"], color: "bg-red-100 text-red-800", icon: "🔤" },
+  { id: 2, title: "Mot Simple", keywords: ["mot simple"], color: "bg-orange-100 text-orange-800", icon: "🐈" },
+  { id: 3, title: "Mot Avancé", keywords: ["mot avancé", "mot avance"], color: "bg-yellow-100 text-yellow-800", icon: "📚" },
+  { id: 4, title: "Graphèmes Complexes", keywords: ["grapheme", "complexe"], color: "bg-emerald-100 text-emerald-800", icon: "🧩" },
+  { id: 5, title: "Phrase", keywords: ["phrase"], color: "bg-cyan-100 text-cyan-800", icon: "🗣️" },
+  { id: 6, title: "Production Écrite", keywords: ["text", "production", "écrite"], color: "bg-violet-100 text-violet-800", icon: "✍️" },
+];
+
+// --- COMPOSANT COACH IA ---
+const CoachIA = () => {
+    const { studentData } = useContext(AppContext);
+    const [messages, setMessages] = useState([{ role: 'ai', text: "Bonjour ! Je suis l'assistant pédagogique. Posez-moi une question sur la classe." }]);
+    const [input, setInput] = useState("");
+    const messagesEndRef = useRef(null);
+
+    const handleSend = (e) => {
+        e.preventDefault();
+        if (!input.trim()) return;
+        setMessages(prev => [...prev, { role: 'user', text: input }]);
+        setInput("");
+        
+        // Simulation réponse IA simple
+        setTimeout(() => {
+            const q = input.toLowerCase();
+            let response = "Je n'ai pas compris. Essayez 'classement' ou le nom d'un élève.";
+            
+            if (q.includes("classe") || q.includes("moyenne")) {
+                const avg = studentData.reduce((acc, s) => acc + s.score, 0) / (studentData.length || 1);
+                response = `La moyenne de la classe est de ${Math.floor(avg)} points.`;
+            } else {
+                const found = studentData.find(s => q.includes(s.name.toLowerCase()));
+                if (found) {
+                    response = `${found.name} est au niveau ${found.level} avec ${found.score} points. ${found.score < 20 ? "Il a besoin de soutien." : "Bonne progression."}`;
+                }
+            }
+            setMessages(prev => [...prev, { role: 'ai', text: response }]);
+        }, 600);
+    };
+
+    useEffect(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), [messages]);
+
+    return (
+        <div className="bg-white rounded-3xl shadow-sm border border-slate-200 h-[600px] flex flex-col">
+            <div className="p-4 border-b bg-indigo-50 flex items-center gap-2 font-bold text-indigo-900"><Bot/> Assistant IA</div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {messages.map((m, i) => (
+                    <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`p-3 rounded-2xl max-w-[80%] text-sm ${m.role === 'user' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-800'}`}>{m.text}</div>
+                    </div>
+                ))}
+                <div ref={messagesEndRef}/>
+            </div>
+            <form onSubmit={handleSend} className="p-3 border-t flex gap-2">
+                <input value={input} onChange={e=>setInput(e.target.value)} className="flex-1 p-2 border rounded-xl" placeholder="Question..." />
+                <button type="submit" className="bg-indigo-600 text-white p-2 rounded-xl"><Send size={18}/></button>
+            </form>
+        </div>
+    );
+};
+
+// --- COMPOSANT APP ---
+const App = () => {
+  // États
+  const [view, setView] = useState('landing');
+  const [currentUser, setCurrentUser] = useState(null);
+  const [loginId, setLoginId] = useState("");
+  const [loginName, setLoginName] = useState("");
+  const [exercisesDoneCount, setExercisesDoneCount] = useState(0);
+  const [sessionCorrectCount, setSessionCorrectCount] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(180);
+  
+  // Prof
+  const [teacherPassword, setTeacherPassword] = useState("");
+  const [showTeacherAuth, setShowTeacherAuth] = useState(false);
+  const [selectedClass, setSelectedClass] = useState('math1');
+  const [teacherTab, setTeacherTab] = useState('students');
+  const [inputRaw, setInputRaw] = useState("");
+  
+  // Score
+  const [scoreSearchCode, setScoreSearchCode] = useState("");
+  const [scoreResult, setScoreResult] = useState(null);
+
+  // Exercice
+  const [currentProblem, setCurrentProblem] = useState(null);
+  const [userAnswer, setUserAnswer] = useState("");
+  const [feedback, setFeedback] = useState(null);
+  const [difficulty, setDifficulty] = useState(1);
+
+  // Données
+  const [studentData, setStudentData] = useState([]);
+  const [activityLogs, setActivityLogs] = useState([]);
+
+  // --- SYNC FIREBASE ---
+  useEffect(() => {
+      if (isFirebaseConfigured) {
+          const unsubscribe = onSnapshot(collection(db, "students"), (snapshot) => {
+              const students = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
+              setStudentData(students);
+          });
+          return () => unsubscribe();
+      } else {
+          // Fallback LocalStorage
+          const saved = localStorage.getItem('school_data_students');
+          if (saved) setStudentData(JSON.parse(saved));
+      }
+  }, []);
+
+  const saveStudent = async (student) => {
+      if (isFirebaseConfigured && student.id) {
+          await setDoc(doc(db, "students", student.id), student);
+      } else {
+          // LocalStorage fallback logic handled by useEffect on studentData change usually
+          // For simplicity here, we update state and save to LS
+          setStudentData(prev => {
+              const next = prev.map(s => s.id === student.id && s.group === student.group ? student : s);
+              // Si nouveau
+              if (!prev.find(s => s.id === student.id && s.group === student.group)) next.push(student);
+              localStorage.setItem('school_data_students', JSON.stringify(next));
+              return next;
+          });
+      }
+  };
+
+  // --- LOGIQUE JEU ---
+  const generateProblem = (level, diff, group) => {
+      const isMath = group.startsWith('math');
+      if (isMath) {
+          const max = diff === 1 ? 10 : (diff === 2 ? 50 : 100);
+          let num1 = Math.floor(Math.random()*max)+1, num2 = Math.floor(Math.random()*max)+1;
+          // Logique simplifiée pour démo
+          if (level === 0) return { q: `${num1} + ${num2} = ?`, a: num1+num2, type: 'number' };
+          if (level === 1) return { q: `${num1+num2} - ${num2} = ?`, a: num1, type: 'number' };
+          if (level === 2) return { q: `${Math.floor(Math.random()*10)} x ${Math.floor(Math.random()*10)} = ?`, a: 'calc', type: 'number' };
+          return { q: `${num1} + ${num2} = ?`, a: num1+num2, type: 'number' };
+      } else {
+          // Français
+          if (level === 0) return { q: "Quelle est cette lettre ?", img: "https://placehold.co/300/blue/white?text=A", a: "A", type: 'mcq', opts: ["A","B","C","D"] };
+          if (level === 6) return { q: "Décris l'image (3 mots)", img: "https://placehold.co/400/orange/white?text=Plage", a: "free", type: 'text' };
+          return { q: "Trouve la voyelle", a: "A", type: 'mcq', opts: ["A","B","C"] };
+      }
+  };
+
+  useEffect(() => {
+      if (view === 'student-exercise' && currentUser && !currentProblem) {
+          // Génération problème (simplifié ici pour éviter bugs, adapter selon logic précédente)
+          const prob = generateProblem(currentUser.level, difficulty, currentUser.group);
+          // Patch pour calcul dyn
+          if (prob.a === 'calc') {
+             const parts = prob.q.split(' ');
+             prob.a = parseInt(parts[0]) * parseInt(parts[2]);
+          }
+          setCurrentProblem({ ...prob, questionText: prob.q, image: prob.img, answer: prob.a, type: prob.type, options: prob.opts });
+      }
+  }, [view, currentUser, currentProblem]);
+
+  useEffect(() => {
+      let timer;
+      if (view === 'student-exercise' && timeLeft > 0) {
+          timer = setInterval(() => setTimeLeft(t => {
+              if (t <= 1) { setView('student-finished'); return 0; }
+              return t-1;
+          }), 1000);
+      }
+      return () => clearInterval(timer);
+  }, [view, timeLeft]);
+
+  const handleLogin = (e) => {
+      e.preventDefault();
+      const code = e.target.code.value.trim().toUpperCase();
+      // On cherche si le code existe dans n'importe quel groupe
+      const existing = studentData.find(s => s.id === code);
+      if (existing) {
+          setLoginId(code);
+          setLoginName(existing.name);
+          setView('student-subject-select');
+      } else {
+          alert("Code inconnu (Importez la liste d'abord)");
+      }
+  };
+
+  const startSession = (subjectType) => {
+      const today = new Date().toLocaleDateString();
+      const group = subjectType === 'math' ? 'math1' : 'fr1'; // Simplification groupes
+      
+      // Chercher ou créer profil
+      let user = studentData.find(s => s.id === loginId && s.group.startsWith(subjectType));
+      
+      if (!user) {
+          user = { id: loginId, name: loginName, level: 0, score: 0, group: group, lastLogin: "" };
+          saveStudent(user); // Crée dans Firebase
+      }
+
+      if (user.lastLogin === today) {
+          alert("Déjà joué aujourd'hui !");
+          return;
+      }
+
+      const updatedUser = { ...user, lastLogin: today };
+      saveStudent(updatedUser); // Update date
+      setCurrentUser(updatedUser);
+      setExercisesDoneCount(0);
+      setSessionCorrectCount(0);
+      setTimeLeft(180);
+      setCurrentProblem(null);
+      setView('student-exercise');
+  };
+
+  const checkAnswer = (val) => {
+      let correct = false;
+      if (currentProblem.type === 'text') correct = val.split(' ').length >= 3;
+      else correct = val.toString().toLowerCase() === currentProblem.answer.toString().toLowerCase();
+
+      if (correct) {
+          setFeedback('correct');
+          setSessionCorrectCount(c => c+1);
+          const newScore = currentUser.score + 1;
+          const upUser = { ...currentUser, score: newScore };
+          setCurrentUser(upUser);
+          saveStudent(upUser); // Sauvegarde immédiate
+      } else {
+          setFeedback('incorrect');
+      }
+
+      setTimeout(() => {
+          setFeedback(null);
+          setUserAnswer("");
+          if (exercisesDoneCount >= 2) {
+              setView('student-finished');
+          } else {
+              setExercisesDoneCount(c => c+1);
+              setCurrentProblem(null); // Trigger useEffect
+          }
+      }, 1500);
+  };
+
+  const handleLevelUp = () => {
+      const canUp = sessionCorrectCount >= 3;
+      if (canUp && currentUser.level < 6) {
+          const upUser = { ...currentUser, level: currentUser.level + 1 };
+          setCurrentUser(upUser);
+          saveStudent(upUser);
+          return true;
+      }
+      return false;
+  };
+
+  // --- PARSEUR CSV ---
+  const parseCSV = () => {
+      const lines = inputRaw.split(/\r?\n/);
+      let count = 0;
+      lines.forEach(l => {
+          const cols = l.split(/[\t;,]/);
+          if (cols.length >= 2) {
+              const id = cols[0].trim().toUpperCase();
+              const name = cols[1].trim();
+              if (id.length > 2 && name) {
+                  // Détection niveau
+                  const lineStr = l.toLowerCase();
+                  let lvl = 0;
+                  const levels = selectedClass.startsWith('math') ? levelsMath : levelsFr;
+                  const foundLvl = levels.find(lv => lv.keywords.some(k => lineStr.includes(k)));
+                  if (foundLvl) lvl = foundLvl.id;
+
+                  const s = { id, name, level: lvl, score: 0, group: selectedClass, lastLogin: "" };
+                  saveStudent(s);
+                  count++;
+              }
+          }
+      });
+      alert(`${count} élèves importés/mis à jour !`);
+  };
+
+  // --- VUES ---
+  if (view === 'landing') return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-100 p-4">
+          <div className="grid gap-4 text-center">
+              <h1 className="text-3xl font-bold mb-4">École Numérique</h1>
+              <button onClick={() => setView('student-login')} className="bg-white p-6 rounded-xl shadow-lg border-2 border-indigo-100 hover:border-indigo-500 font-bold text-xl flex flex-col items-center gap-2"><GraduationCap size={40} className="text-indigo-600"/> Élève</button>
+              <button onClick={() => setView('check-score')} className="bg-white p-6 rounded-xl shadow-lg border-2 border-orange-100 hover:border-orange-500 font-bold text-xl flex flex-col items-center gap-2"><Trophy size={40} className="text-orange-600"/> Classement</button>
+              <button onClick={() => setView('teacher-auth')} className="bg-white p-6 rounded-xl shadow-lg border-2 border-emerald-100 hover:border-emerald-500 font-bold text-xl flex flex-col items-center gap-2"><Users size={40} className="text-emerald-600"/> Professeur</button>
+              <div className="text-xs text-slate-400 mt-4">{isFirebaseConfigured ? "🟢 Connecté au Cloud" : "🟠 Mode Local"}</div>
+          </div>
+      </div>
+  );
+
+  if (view === 'student-login') return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-100">
+          <form onSubmit={handleLogin} className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-sm text-center">
+              <h2 className="text-2xl font-bold mb-6">Connexion</h2>
+              <input name="code" className="w-full p-4 border-2 rounded-xl mb-4 text-center uppercase font-bold" placeholder="TON CODE" autoFocus />
+              <button className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold">ENTRER</button>
+              <button type="button" onClick={() => setView('landing')} className="mt-4 text-sm text-slate-400">Retour</button>
+          </form>
+      </div>
+  );
+
+  if (view === 'student-subject-select') return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-100">
+          <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md text-center">
+              <h2 className="text-2xl font-bold mb-2">Bonjour {loginName}</h2>
+              <p className="mb-6 text-slate-500">Choisis ta matière</p>
+              <div className="grid grid-cols-2 gap-4">
+                  <button onClick={() => startSession('math')} className="p-6 border-2 rounded-xl hover:bg-blue-50 font-bold flex flex-col items-center gap-2"><Calculator className="text-blue-500"/> Maths</button>
+                  <button onClick={() => startSession('fr')} className="p-6 border-2 rounded-xl hover:bg-pink-50 font-bold flex flex-col items-center gap-2"><Languages className="text-pink-500"/> Français</button>
+              </div>
+          </div>
+      </div>
+  );
+
+  if (view === 'student-exercise') return (
+      <div className="min-h-screen flex flex-col items-center bg-slate-50 p-6">
+          <div className="w-full max-w-md flex justify-between mb-6">
+              <div className="font-bold">{currentUser.name}</div>
+              <div className="flex items-center gap-2 font-mono"><Timer size={16}/> {Math.floor(timeLeft/60)}:{(timeLeft%60).toString().padStart(2,'0')}</div>
+          </div>
+          <div className="bg-white p-8 rounded-3xl shadow-xl w-full max-w-md text-center relative overflow-hidden">
+              {feedback && <div className={`absolute inset-0 flex items-center justify-center text-white font-black text-2xl ${feedback === 'correct' ? 'bg-green-500' : 'bg-red-500'}`}>{feedback === 'correct' ? 'BRAVO !' : 'OUPS...'}</div>}
+              <div className="text-xs font-bold uppercase text-slate-400 mb-2">Question {exercisesDoneCount + 1} / 3</div>
+              <h2 className="text-2xl font-bold mb-6">{currentProblem.questionText}</h2>
+              {currentProblem.image && <img src={currentProblem.image} className="w-full h-32 object-cover rounded-xl mb-6"/>}
+              {currentProblem.type === 'mcq' ? (
+                  <div className="grid grid-cols-2 gap-3">{currentProblem.options.map(o => <button key={o} onClick={() => checkAnswer(o)} className="p-4 border-2 rounded-xl font-bold hover:bg-slate-50">{o}</button>)}</div>
+              ) : (
+                  <><input value={userAnswer} onChange={e => setUserAnswer(e.target.value)} className="w-full p-4 border-2 rounded-xl text-center text-xl font-bold mb-4" placeholder="Réponse..." autoFocus /><button onClick={() => checkAnswer(userAnswer)} className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold">Valider</button></>
+              )}
+          </div>
+      </div>
+  );
+
+  if (view === 'student-finished') {
+      const isUp = handleLevelUp();
+      return (
+          <div className="min-h-screen flex items-center justify-center bg-slate-100">
+              <div className="bg-white p-8 rounded-3xl shadow-xl text-center max-w-sm">
+                  <div className="mb-4 flex justify-center">{isUp ? <ArrowUpCircle size={64} className="text-green-500"/> : <Trophy size={64} className="text-yellow-500"/>}</div>
+                  <h2 className="text-2xl font-bold mb-2">{isUp ? "Niveau Supérieur !" : "Terminé !"}</h2>
+                  <p className="mb-4">Score: {sessionCorrectCount}/3 bonnes réponses.</p>
+                  <div className="bg-slate-100 p-4 rounded-xl font-bold text-indigo-600 text-xl mb-4">Total: {currentUser.score} pts</div>
+                  <button onClick={() => setView('landing')} className="w-full bg-slate-800 text-white py-3 rounded-xl">Retour</button>
+              </div>
+          </div>
+      );
+  }
+
+  if (view === 'check-score') return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-100 p-4">
+          <div className="bg-white p-6 rounded-3xl shadow-xl w-full max-w-md h-[80vh] flex flex-col">
+              <h2 className="text-xl font-bold mb-4 text-center">Classement</h2>
+              {!scoreResult ? (
+                  <div className="flex-1 flex flex-col justify-center">
+                      <input className="w-full p-4 border-2 rounded-xl text-center uppercase font-bold mb-4" placeholder="TON CODE" value={scoreSearchCode} onChange={e => setScoreSearchCode(e.target.value)} />
+                      <button onClick={() => {
+                          const found = studentData.find(s => s.id === scoreSearchCode.trim().toUpperCase());
+                          if (found) setScoreResult(found); else alert("Introuvable");
+                      }} className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold">Chercher</button>
+                      <button onClick={() => setView('landing')} className="mt-4 text-slate-400">Retour</button>
+                  </div>
+              ) : (
+                  <div className="flex-1 overflow-hidden flex flex-col">
+                      <div className="bg-indigo-600 text-white p-4 rounded-2xl mb-4 text-center">
+                          <h3 className="font-bold text-xl">{scoreResult.name}</h3>
+                          <div className="text-sm opacity-80">{scoreResult.group}</div>
+                          <div className="text-3xl font-black mt-2">{scoreResult.score} pts</div>
+                      </div>
+                      <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                          {studentData.filter(s => s.group === scoreResult.group).sort((a,b) => b.score - a.score).map((s, idx) => (
+                              <div key={s.id} className={`flex justify-between p-3 rounded-xl border ${s.id === scoreResult.id ? 'bg-indigo-50 border-indigo-500' : 'bg-white'}`}>
+                                  <div className="flex gap-3"><span className="font-bold w-6 text-slate-400">#{idx+1}</span> <span className="font-bold">{s.name}</span></div>
+                                  <div className="font-mono">{s.score}</div>
+                              </div>
+                          ))}
+                      </div>
+                      <button onClick={() => { setScoreResult(null); setScoreSearchCode(""); }} className="mt-4 w-full bg-slate-100 py-3 rounded-xl">Retour</button>
+                  </div>
+              )}
+          </div>
+      </div>
+  );
+
+  if (view === 'teacher-auth') return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-100">
+          <div className="bg-white p-8 rounded-3xl shadow-xl text-center">
+              <h2 className="font-bold text-xl mb-4">Espace Professeur</h2>
+              <input type="password" value={teacherPassword} onChange={e => setTeacherPassword(e.target.value)} className="p-3 border rounded-xl w-full mb-4 text-center" placeholder="Mot de passe" />
+              <button onClick={() => { if(teacherPassword === "oustadsana") setView('teacher-dash'); else alert("Non"); }} className="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold">Entrer</button>
+              <button onClick={() => setView('landing')} className="mt-4 text-sm text-slate-400">Annuler</button>
+          </div>
+      </div>
+  );
+
+  if (view === 'teacher-dash') return (
+      <div className="min-h-screen bg-slate-50 p-6">
+          <div className="max-w-5xl mx-auto space-y-6">
+              <header className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm">
+                  <h2 className="font-bold text-xl flex items-center gap-2"><LayoutGrid/> Dashboard</h2>
+                  <button onClick={() => setView('landing')} className="text-slate-500">Quitter</button>
+              </header>
+              <div className="flex gap-2 overflow-x-auto pb-2">
+                  <button onClick={() => setTeacherTab('students')} className={`px-4 py-2 rounded-lg font-bold ${teacherTab === 'students' ? 'bg-slate-800 text-white' : 'bg-white'}`}>Élèves</button>
+                  <button onClick={() => setTeacherTab('coach')} className={`px-4 py-2 rounded-lg font-bold ${teacherTab === 'coach' ? 'bg-indigo-600 text-white' : 'bg-white'}`}>IA Coach</button>
+              </div>
+              {teacherTab === 'students' && (
+                  <div className="grid lg:grid-cols-3 gap-6">
+                      <div className="bg-white p-6 rounded-2xl shadow-sm">
+                          <h3 className="font-bold mb-4">Importer (Excel)</h3>
+                          <div className="mb-4 flex gap-2">
+                              <button onClick={() => setSelectedClass('math1')} className={`flex-1 py-2 rounded border ${selectedClass === 'math1' ? 'bg-blue-100 border-blue-500' : ''}`}>Maths</button>
+                              <button onClick={() => setSelectedClass('fr1')} className={`flex-1 py-2 rounded border ${selectedClass === 'fr1' ? 'bg-pink-100 border-pink-500' : ''}`}>Français</button>
+                          </div>
+                          <textarea className="w-full h-32 p-2 border rounded-xl text-xs mb-2" placeholder="ID... Nom... Niveau..." value={inputRaw} onChange={e => setInputRaw(e.target.value)} />
+                          <button onClick={parseCSV} className="w-full bg-slate-800 text-white py-2 rounded-lg font-bold">Lancer Import</button>
+                      </div>
+                      <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm h-[500px] overflow-auto">
+                          <h3 className="font-bold mb-4">Liste Élèves ({selectedClass})</h3>
+                          <table className="w-full text-left text-sm">
+                              <thead><tr className="text-slate-400 border-b"><th className="pb-2">Nom</th><th className="pb-2">Niv</th><th className="pb-2">Score</th><th className="pb-2">Action</th></tr></thead>
+                              <tbody>
+                                  {studentData.filter(s => s.group === selectedClass).map(s => (
+                                      <tr key={s.id} className="border-b last:border-0">
+                                          <td className="py-3 font-bold">{s.name}</td>
+                                          <td className="py-3"><span className="bg-slate-100 px-2 py-1 rounded text-xs">{s.level}</span></td>
+                                          <td className="py-3 font-mono text-indigo-600">{s.score}</td>
+                                          <td className="py-3"><button onClick={() => { const up = { ...s, lastLogin: "" }; saveStudent(up); alert("Reset OK"); }} className="text-xs text-orange-500 border border-orange-200 px-2 py-1 rounded hover:bg-orange-50">Reset Jour</button></td>
+                                      </tr>
+                                  ))}
+                              </tbody>
+                          </table>
+                      </div>
+                  </div>
+              )}
+              {teacherTab === 'coach' && <CoachIA />}
+          </div>
+      </div>
+  );
+
+  return <div>Chargement...</div>;
+};
+
+export default App;
