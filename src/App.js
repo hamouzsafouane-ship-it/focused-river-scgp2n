@@ -45,12 +45,13 @@ import {
 // --- CONFIGURATION FIREBASE (À REMPLIR PLUS TARD) ---
 // Pour l'instant, laissez vide pour utiliser le mode LocalStorage automatique.
 const firebaseConfig = {
-  apiKey: "",
-  authDomain: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: "",
+  apiKey: "AIzaSyCQy6wWhd5nLdwlIS8uXb6bdut2DdOkzzw",
+  authDomain: "classe-5e7ef.firebaseapp.com",
+  projectId: "classe-5e7ef",
+  storageBucket: "classe-5e7ef.firebasestorage.app",
+  messagingSenderId: "127093990636",
+  appId: "1:127093990636:web:289e2e4c5ce2aa11dff1c9",
+  measurementId: "G-5GEBQV2ZLX",
 };
 
 // --- UTILITAIRES & CONTEXTE ---
